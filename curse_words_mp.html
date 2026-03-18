@@ -416,7 +416,7 @@ function getView(auth,pi){
     mySBMode:auth.smokeBombMode[pi],
     // Scrub opponent's played words from log so stealthy tiles aren't revealed
     log:auth.log.map(entry=>entry.replace(
-      new RegExp(`(P${oi+1} played ")[^"]+("`),`$1???$2`
+      new RegExp(`(P${oi+1} played ")[^"]+(")`),'$1???$2'
     )),
   };
 }
