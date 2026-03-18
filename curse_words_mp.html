@@ -416,12 +416,10 @@ function getView(auth,pi){
     mySBMode:auth.smokeBombMode[pi],
     // Scrub opponent's played words from log so stealthy tiles aren't revealed
     log:auth.log.map(entry=>{
-      const prefix=`P${oi+1} played "`;
-      if(!entry.startsWith(prefix))return entry;
-      const rest=entry.slice(prefix.length);
-      const close=rest.indexOf('"');
-      if(close===-1)return entry;
-      return prefix+'???'+rest.slice(close);
+      if(!entry.includes('§'))return entry;
+      const isOpp=entry.startsWith(`P${oi+1} played "`);
+      // Replace "full§masked" with whichever version is appropriate
+      return entry.replace(/"([^§"]+)§([^"]+)"/, (_,full,masked)=>isOpp?`"${masked}"`:  `"${full}"`);
     }),
   };
 }
@@ -772,17 +770,17 @@ function BoardView({board,staged,isPlayerOwner,sbMode,onClick,onDrop,onStagedDra
 function HUD({label,cls,hp,maxHP,mana,xp,ua,side,onInfo}){
   const pct=Math.max(0,hp/maxHP)*100,hc=pct>50?cls.color:pct>25?"#f59e0b":"#ef4444";
   const lv=xp!=null?lvX(xp):null;
+  const isRight=side==="right";
   return(
     <div style={{flex:1,padding:"10px 12px",background:"#12101f",borderRadius:8,border:`1px solid ${cls.accent}`,position:"relative"}}>
-      <div onClick={onInfo} style={{position:"absolute",top:8,right:8,width:18,height:18,borderRadius:"50%",border:`1px solid ${cls.color}`,color:cls.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,cursor:"pointer"}}>i</div>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-        {side==="left"&&cls.icon()}
+      <div onClick={onInfo} style={{position:"absolute",top:8,[isRight?"left":"right"]:8,width:18,height:18,borderRadius:"50%",border:`1px solid ${cls.color}`,color:cls.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,cursor:"pointer"}}>i</div>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexDirection:isRight?"row-reverse":"row"}}>
+        <div style={{transform:isRight?"scaleX(-1)":"none"}}>{cls.icon()}</div>
         <div style={{flex:1}}>
-          <div style={{fontSize:10,color:"#6b7280"}}>{label}</div>
-          <div style={{fontSize:13,fontWeight:"bold",color:cls.color}}>{cls.name}</div>
-          {ua&&ua.map(id=>{const ab=cls.abilities.find(a=>a.id===id);return ab?<div key={id} style={{fontSize:9,color:ab.passive?cls.color:"#fb923c"}}>{ab.icon} {ab.name}</div>:null;})}
+          <div style={{fontSize:10,color:"#6b7280",textAlign:isRight?"right":"left"}}>{label}</div>
+          <div style={{fontSize:13,fontWeight:"bold",color:cls.color,textAlign:isRight?"right":"left"}}>{cls.name}</div>
+          {ua&&ua.map(id=>{const ab=cls.abilities.find(a=>a.id===id);return ab?<div key={id} style={{fontSize:9,color:ab.passive?cls.color:"#fb923c",textAlign:isRight?"right":"left"}}>{ab.icon} {ab.name}</div>:null;})}
         </div>
-        {side==="right"&&cls.icon()}
       </div>
       <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}><span style={{color:"#6b7280"}}>HP</span><span style={{color:hc,fontWeight:"bold"}}>{hp}/{maxHP}</span></div>
       <div style={{height:7,background:"#1a1a2e",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,background:hc,borderRadius:4,transition:"width .4s"}}/></div>
