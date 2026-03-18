@@ -218,7 +218,7 @@ function processAction(s,action,pi){
     const nSBM=[...s.smokeBombMode];nSBM[pi]=false;
     return{...s,board:nb,deck:nd,hands:newHands,graveyards:newGY,mana:newMana,xp:newXPs,hp:newHP,
       ua:newUA,pendingLU:newPLU,lightArmed:nLA,fireArmed:nFA,iceArmed:nIA,
-      sbCooldown:nSB,craneRed:nCR,fadeShield:nFS,smokeBombMode:nSBM,
+      sbCooldown:nSB,craneRed:nCR,fadeShield:s.fadeShield,smokeBombMode:nSBM,
       isFirstWord:s.isFirstWord.map((v,i)=>i===pi?false:v),
       whoseTurn:oi,turnPhase:"challenge",
       lastPlay:{pi,oi,words,cells:placed,dmg,pFire,pFreeze,pTiger,pSnake},
