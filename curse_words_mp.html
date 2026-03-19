@@ -307,20 +307,31 @@ function initAuth(c0,c1){
 }
 
 function lvUp(s,pi,xpAdd){
-  var ua=s.ua.map(function(a){return a.slice();});var plu=s.pendingLU.slice();
-  var oldLv=lvX(s.xp[pi]),newXP=s.xp[pi]+xpAdd,newLv=lvX(newXP);
+  var ua=s.ua.map(function(a){return a.slice();});
+  var plu=s.pendingLU.slice();
+  var newXPs=s.xp.slice();
+  var currentXP=s.xp[pi];
+  var newXP=currentXP+xpAdd;
+  newXPs[pi]=newXP;
+  var oldLv=lvX(currentXP),newLv=lvX(newXP);
   if(newLv>oldLv){
     var cls=CLS[s.classIds[pi]];
+    // Pool ALL unpicked abilities up to newLv (not just exactly newLv)
+    // so players can catch up on earlier tiers whose prereqs are now met
     var choices=cls.abilities.filter(function(ab){
-      if(ab.lv!==newLv||ua[pi].includes(ab.id)||ab.notAvailable)return false;
+      if(ab.lv<2||ab.lv>newLv)return false;
+      if(ua[pi].includes(ab.id)||ab.notAvailable)return false;
       if(ab.prereqs)return ab.prereqs.every(function(id){return ua[pi].includes(id);});
-      if(ab.lv>=3){var hp=cls.abilities.some(function(a){return a.lv===ab.lv-1&&ua[pi].includes(a.id);});if(!hp)return false;}
+      // For abilities without explicit prereqs, require at least one ability from the previous tier
+      if(ab.lv>=3){
+        var hasPrev=cls.abilities.some(function(a){return a.lv===ab.lv-1&&ua[pi].includes(a.id);});
+        if(!hasPrev)return false;
+      }
       return true;
     });
     if(choices.length===1)ua[pi].push(choices[0].id);
     else if(choices.length>1)plu[pi]={level:newLv,choices:choices};
   }
-  var newXPs=s.xp.slice();newXPs[pi]=newXP;
   return{ua:ua,plu:plu,newXPs:newXPs};
 }
 
@@ -436,7 +447,8 @@ function processAction(s,action,pi){
       bonusNotes.push("🦴 BONE BLAST +"+bbBonus+"dmg");
     }
 
-    var lvRes=lvUp(s,pi,xpG+bonusXP);
+    // Store XP to grant but don't apply it yet — wait for PASS (challenge resolved)
+    var lvRes=lvUp(s,pi,0); // no XP yet
     var pFire=s.fireArmed[pi]?(primary.length>=6?3:primary.length===5?2:primary.length>=4?1:0):0;
     var pFreeze=s.iceArmed[pi]?(primary.length>=5?2:primary.length===4?1:0):0;
     var pVowel=s.vowelArmed[pi]?(primary.length>=7?3:primary.length===6?2:primary.length===5?1:0):0;
@@ -472,7 +484,7 @@ function processAction(s,action,pi){
       disabledLeft:nDisLeft,disabledUA:nDisUA,
       isFirstWord:s.isFirstWord.map(function(v,i){return i===pi?false:v;}),
       whoseTurn:oi,turnPhase:"challenge",
-      lastPlay:{pi:pi,oi:oi,words:words,cells:placed,dmg:dmg,pFire:pFire,pFreeze:pFreeze,pTiger:pTiger,pSnake:pSnake,pVowel:pVowel},
+      lastPlay:{pi:pi,oi:oi,words:words,cells:placed,dmg:dmg,pendingXP:xpG+bonusXP,pFire:pFire,pFreeze:pFreeze,pTiger:pTiger,pSnake:pSnake,pVowel:pVowel},
       log:["P"+(pi+1)+" played "+logWord+shapeNote+extra+" ->"+dmg+"dmg"+bonusStr].concat(s.log).slice(0,20)});
   }
 
@@ -530,6 +542,9 @@ function processAction(s,action,pi){
     var ns=Object.assign({},s,{hp:newHP,hands:newHands,fadeShield:nFS,craneRed:nCR,lastUnchallengedPlay:nLUP,
       disabledUA:newDisUA,disabledLeft:newDisLeft,whoseTurn:pi,turnPhase:"play",lastPlay:null,
       log:["P"+(pi+1)+" passed - "+dmg+"dmg"+extraNote].concat(s.log).slice(0,20)});
+    // Now that the word is accepted, grant XP to the player who played it
+    var lvRes=lvUp(ns,lp.pi,lp.pendingXP||0);
+    ns=Object.assign({},ns,{xp:lvRes.newXPs,ua:lvRes.ua,pendingLU:lvRes.plu});
     if(s.ua[lp.pi].includes("skeletal_warrior")&&s.graveyards[lp.pi].length>=2)ns=runMinion(ns,lp.pi);
     return ns;
   }
@@ -836,7 +851,7 @@ function LobbyScreen({onSolo,onMP}){
   return(
     <div style={{fontFamily:"monospace",background:"#1a1a2e",minHeight:"100vh",color:"#e0e0f0",padding:32,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24}}>
       <div style={{fontSize:32,color:"#c084fc",letterSpacing:4,fontWeight:"bold"}}>💀 CURSE WORDS</div>
-      <div style={{fontSize:10,color:"#4b5563",marginTop:-16}}>v2.6</div>
+      <div style={{fontSize:10,color:"#4b5563",marginTop:-16}}>v2.7</div>
       <div style={{fontSize:13,color:"#6b7280"}}>3D word battle. Play words — fight your opponent.</div>
       <div style={{display:"flex",gap:16,marginTop:16}}>
         <button onClick={onSolo} style={{padding:"14px 32px",background:"#1c0a2e",border:"2px solid #7c3aed",borderRadius:10,color:"#c084fc",cursor:"pointer",fontSize:15,fontFamily:"monospace"}} onMouseEnter={function(e){e.target.style.background="#2d1260";}} onMouseLeave={function(e){e.target.style.background="#1c0a2e";}}>🤖 vs AI</button>
