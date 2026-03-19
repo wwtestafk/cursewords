@@ -709,12 +709,16 @@ function unpackAuth(auth){
 function safeBoard(b){return(b&&Array.isArray(b)&&b.length===LY)?b:emptyBoard();}
 
 function gen4Code(){var c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";return Array.from({length:4},function(){return c[0|Math.random()*c.length];}).join("");}
-// Single unified data dispatcher — avoids double-listener from setupConn + game handler
 function mkPeerConn(conn){
-  var cbs={};
-  conn.on("data",function(d){if(cbs.data)cbs.data(d);});
-  conn.on("error",function(e){if(cbs.error)cbs.error(e);});
-  return{send:function(d){conn.send(d);},on:function(ev,cb){cbs[ev]=cb;},raw:conn};
+  var handlerRef={current:null};
+  conn.on("data",function(d){if(handlerRef.current)handlerRef.current(d);});
+  conn.on("error",function(e){console.error("[PeerConn] error",e);});
+  return{
+    send:function(d){conn.send(d);},
+    on:function(ev,cb){if(ev==="data")handlerRef.current=cb;},
+    raw:conn,
+    handlerRef:handlerRef
+  };
 }
 
 class ErrBound extends React.Component{
@@ -809,7 +813,7 @@ function LobbyScreen({onSolo,onMP}){
   return(
     <div style={{fontFamily:"monospace",background:"#1a1a2e",minHeight:"100vh",color:"#e0e0f0",padding:32,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24}}>
       <div style={{fontSize:32,color:"#c084fc",letterSpacing:4,fontWeight:"bold"}}>💀 CURSE WORDS</div>
-      <div style={{fontSize:10,color:"#4b5563",marginTop:-16}}>v2.4</div>
+      <div style={{fontSize:10,color:"#4b5563",marginTop:-16}}>v2.5</div>
       <div style={{fontSize:13,color:"#6b7280"}}>3D word battle. Play words — fight your opponent.</div>
       <div style={{display:"flex",gap:16,marginTop:16}}>
         <button onClick={onSolo} style={{padding:"14px 32px",background:"#1c0a2e",border:"2px solid #7c3aed",borderRadius:10,color:"#c084fc",cursor:"pointer",fontSize:15,fontFamily:"monospace"}} onMouseEnter={function(e){e.target.style.background="#2d1260";}} onMouseLeave={function(e){e.target.style.background="#1c0a2e";}}>🤖 vs AI</button>
