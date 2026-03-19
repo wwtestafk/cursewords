@@ -686,6 +686,20 @@ function getView(auth,pi){
   });
 }
 
+// Compress board to only non-null cells for sending over the wire
+function compressBoard(board){
+  var cells=[];
+  board.forEach(function(layer,la){layer.forEach(function(row,r){row.forEach(function(cell,c){if(cell.letter)cells.push([la,r,c,cell.letter,cell.owner,cell.stealthy?1:0]);});});});
+  return cells;
+}
+function decompressBoard(cells){
+  var b=emptyBoard();
+  (cells||[]).forEach(function(cell){b[cell[0]][cell[1]][cell[2]]={letter:cell[3],owner:cell[4],stealthy:!!cell[5]};});
+  return b;
+}
+function packAuth(auth){return Object.assign({},auth,{board:compressBoard(auth.board)});}
+function unpackAuth(auth){return Object.assign({},auth,{board:decompressBoard(auth.board)});}
+
 function gen4Code(){var c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";return Array.from({length:4},function(){return c[0|Math.random()*c.length];}).join("");}
 // Single unified data dispatcher — avoids double-listener from setupConn + game handler
 function mkPeerConn(conn){
@@ -862,9 +876,7 @@ function MPLobby({onStart,onBack}){
   useEffect(function(){
     if(roleRef.current!=="host"||!myCls||!oppClsRcv)return;
     var auth=initAuth(myCls,oppClsRcv);
-    // Strip the empty board before sending — it's ~40KB of nulls and reconstructed on the other side
-    var msgAuth=Object.assign({},auth,{board:null});
-    connWrapRef.current.send({type:"GAME_START",auth:msgAuth});
+    connWrapRef.current.send({type:"GAME_START",auth:packAuth(auth)});
     onStart({auth:auth,pi:0,isHost:true,conn:connWrapRef.current});
   },[myCls,oppClsRcv]);
 
@@ -1304,7 +1316,14 @@ function SoloGame({c0,c1,onRestart}){
 function MPGame({auth:initA,pi,isHost,conn,onRestart}){
   var[auth,setAuth]=useState(initA);var authRef=useRef(initA);
   useEffect(function(){authRef.current=auth;},[auth]);
-  useEffect(function(){if(!conn)return;conn.on("data",function(msg){if(msg.type==="STATE")setAuth(msg.auth);if(msg.type==="ACTION"&&isHost){setAuth(function(s){var ns=processAction(s,msg.action,1-pi);conn.send({type:"STATE",auth:ns});return ns;});}});},[conn,isHost,pi]);
+  useEffect(function(){if(!conn)return;conn.on("data",function(msg){
+    if(msg.type==="STATE")setAuth(unpackAuth(msg.auth));
+    if(msg.type==="ACTION"&&isHost){setAuth(function(s){
+      var ns=processAction(s,msg.action,1-pi);
+      conn.send({type:"STATE",auth:packAuth(ns)});
+      return ns;
+    });}
+  });},[conn,isHost,pi]);
   var handleAction=useCallback(function(action){if(isHost){setAuth(function(s){var ns=processAction(s,action,pi);conn&&conn.send({type:"STATE",auth:ns});return ns;});}else conn&&conn.send({type:"ACTION",action:action});});
   return <GameUI auth={auth} onAction={handleAction} myPI={pi} isSolo={false} aiThinking={false} minionThinking={false} onRestart={onRestart}/>;
 }
