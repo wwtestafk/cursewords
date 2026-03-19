@@ -698,16 +698,39 @@ function decompressBoard(cells){
   (cells||[]).forEach(function(cell){b[cell[0]][cell[1]][cell[2]]={letter:cell[3],owner:cell[4],stealthy:!!cell[5]};});
   return b;
 }
-function packAuth(auth){return Object.assign({},auth,{board:compressBoard(auth.board)});}
+// Compress a hand/graveyard array to save wire bytes
+function packHand(hand){
+  return hand.map(function(t){return[t.id,t.letter,t.stealthy?1:0,t.burning?1:0,t.frozenTurns||0];});
+}
+function unpackHand(hand){
+  return hand.map(function(t){
+    if(Array.isArray(t))return{id:t[0],letter:t[1],stealthy:!!t[2],burning:!!t[3],frozenTurns:t[4]||0};
+    return t; // already an object (old format)
+  });
+}
+function packAuth(auth){
+  return Object.assign({},auth,{
+    board:compressBoard(auth.board),
+    deck:auth.deck.join(''),          // array of letters → string
+    hands:auth.hands.map(packHand),
+    graveyards:auth.graveyards.map(packHand),
+    log:auth.log.slice(0,5)           // trim log to 5 entries
+  });
+}
 function unpackAuth(auth){
   if(!auth)return null;
   var b=auth.board;
-  if(!b||!Array.isArray(b))return Object.assign({},auth,{board:emptyBoard()});
-  if(b.length===LY&&Array.isArray(b[0])&&Array.isArray(b[0][0]))return auth;
-  return Object.assign({},auth,{board:decompressBoard(b)});
+  var board;
+  if(!b||!Array.isArray(b))board=emptyBoard();
+  else if(b.length===LY&&Array.isArray(b[0])&&Array.isArray(b[0][0]))board=b;
+  else board=decompressBoard(b);
+  var deck=typeof auth.deck==='string'?auth.deck.split(''):(auth.deck||[]);
+  var hands=(auth.hands||[[],[]]).map(function(h){return h.length&&Array.isArray(h[0])?unpackHand(h):h;});
+  var graveyards=(auth.graveyards||[[],[]]).map(function(g){return g.length&&Array.isArray(g[0])?unpackHand(g):g;});
+  return Object.assign({},auth,{board:board,deck:deck,hands:hands,graveyards:graveyards});
 }
-function safeBoard(b){return(b&&Array.isArray(b)&&b.length===LY)?b:emptyBoard();}
 
+function safeBoard(b){return(b&&Array.isArray(b)&&b.length===LY)?b:emptyBoard();}
 function gen4Code(){var c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";return Array.from({length:4},function(){return c[0|Math.random()*c.length];}).join("");}
 function mkPeerConn(conn){
   var handlerRef={current:null};
@@ -813,7 +836,7 @@ function LobbyScreen({onSolo,onMP}){
   return(
     <div style={{fontFamily:"monospace",background:"#1a1a2e",minHeight:"100vh",color:"#e0e0f0",padding:32,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24}}>
       <div style={{fontSize:32,color:"#c084fc",letterSpacing:4,fontWeight:"bold"}}>💀 CURSE WORDS</div>
-      <div style={{fontSize:10,color:"#4b5563",marginTop:-16}}>v2.5</div>
+      <div style={{fontSize:10,color:"#4b5563",marginTop:-16}}>v2.6</div>
       <div style={{fontSize:13,color:"#6b7280"}}>3D word battle. Play words — fight your opponent.</div>
       <div style={{display:"flex",gap:16,marginTop:16}}>
         <button onClick={onSolo} style={{padding:"14px 32px",background:"#1c0a2e",border:"2px solid #7c3aed",borderRadius:10,color:"#c084fc",cursor:"pointer",fontSize:15,fontFamily:"monospace"}} onMouseEnter={function(e){e.target.style.background="#2d1260";}} onMouseLeave={function(e){e.target.style.background="#1c0a2e";}}>🤖 vs AI</button>
@@ -874,7 +897,7 @@ function MPLobby({onStart,onBack}){
     roleRef.current="guest";setStatus("Connecting...");
     var peer=new Peer({debug:0});peerRef.current=peer;
     peer.on("open",function(){
-      var conn=peer.connect("cw4-"+tc,{reliable:true,serialization:"json"});
+    var conn=peer.connect("cw4-"+tc,{reliable:true,serialization:"binary"});
       setupConn(conn,"guest");
     });
     peer.on("error",function(e){setStatus("Error: "+(e.type||e.message));});
