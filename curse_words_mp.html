@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>💀 Curse Words v2.4</title>
+<title>💀 Curse Words v2.5</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.3/babel.min.js"></script>
@@ -265,8 +265,7 @@ if(action.type==="CHALLENGE"){
     var rTraps=snap.traps!==undefined?snap.traps:ns0.traps;
     var rHP=ns0.hp.slice();
     if(snap.myHP!==undefined){
-      var prePlayHP=snap.myHP-(snap.trapDmg||0);
-      var lifeDrainHeal=Math.max(0,prePlayHP-(s.hp[actPI]-cDmg));
+      var lifeDrainHeal=Math.max(0,s.hp[actPI]-snap.myHP+(snap.trapDmg||0));
       rHP[actPI]=Math.max(0,ns0.hp[actPI]-lifeDrainHeal);
     }
     var rHands=ns0.hands.map(function(h){return h.slice();});if(snap.oppHand!==undefined)rHands[oi]=snap.oppHand;
