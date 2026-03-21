@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>💀 Curse Words v2.5</title>
+<title>💀 Curse Words v2.3</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.3/babel.min.js"></script>
@@ -163,10 +163,12 @@ function applySacredGround(s){
   var count=2+(s.ua[pi]&&s.ua[pi].includes("devout")?1:0);
   var occupied=new Set();
   s.board[ML].forEach(function(row,r){row.forEach(function(cell,c){if(cell.letter)occupied.add(r+","+c);});});
+  var existingSG=(s.sacredGroundCells||[]).filter(function(c){return !occupied.has(c.row+","+c.col);});
+  var existingKeys=new Set(existingSG.map(function(c){return c.row+","+c.col;}));
   var candidates=[];
-  for(var r=0;r<RW;r++){for(var c=0;c<CL;c++){if(!occupied.has(r+","+c))candidates.push({row:r,col:c});}}
+  for(var r=0;r<RW;r++){for(var c=0;c<CL;c++){var k=r+","+c;if(!occupied.has(k)&&!existingKeys.has(k))candidates.push({row:r,col:c});}}
   for(var i=candidates.length-1;i>0;i--){var j=0|Math.random()*(i+1);var tmp=candidates[i];candidates[i]=candidates[j];candidates[j]=tmp;}
-  var newSG=candidates.slice(0,Math.min(count,candidates.length));
+  var newSG=existingSG.concat(candidates.slice(0,Math.min(count,candidates.length)));
   var newSpecials=Object.assign({},s.specialCells);
   newSG.forEach(function(cell){var key=ML+","+cell.row+","+cell.col;if(newSpecials[key])delete newSpecials[key];});
   return Object.assign({},s,{sacredGroundCells:newSG,specialCells:newSpecials});
@@ -197,7 +199,7 @@ if(action.type==="PLAY_WORD"){
   var sgSet=new Set((s.sacredGroundCells||[]).map(function(c){return c.row+","+c.col;}));
   var sacredGroundHit=cid==="theologian"&&staged.some(function(p){return sgSet.has(p.row+","+p.col);});
   if(cid==="taxonomist"&&ua.includes("field_notes")){var ul=new Set(primary.split("")).size;xpG+=ul;bonusNotes.push("📋+"+ul+"xp");}
-  if(ua.includes("lightning_mastery"))dmg+=cntAdjLong(nb,placed,words)*5;
+  if(ua.includes("lightning_mastery"))dmg+=cntAdjLong(nb,placed,words)*15;
   if(s.mantisOn[pi]&&words.length>1)dmg*=2;
   var newHands=s.hands.map(function(h){return h.slice();});var newMetalCells=Object.assign({},s.metalCells);var onomStealthHand=false;
   if(cid==="dyslexic"&&ua.includes("onomatopoeia")&&isOnom(primary)){var onomEff=["fireball","freeze","metal","stealth"][0|Math.random()*4];if(onomEff==="fireball"){var unb=newHands[oi].map(function(t,i){return Object.assign({},t,{_i:i});}).filter(function(t){return !t.burning;});var cnt=Math.min(2,unb.length);unb.sort(function(){return Math.random()-0.5;}).slice(0,cnt).forEach(function(t){newHands[oi][t._i]=Object.assign({},newHands[oi][t._i],{burning:true});});if(cnt>0)bonusNotes.push("💥 "+cnt+" ignited!");}else if(onomEff==="freeze"){var unf=newHands[oi].map(function(t,i){return Object.assign({},t,{_i:i});}).filter(function(t){return !(t.frozenTurns>0);});var cnt2=Math.min(2,unf.length);unf.sort(function(){return Math.random()-0.5;}).slice(0,cnt2).forEach(function(t){newHands[oi][t._i]=Object.assign({},newHands[oi][t._i],{frozenTurns:2});});if(cnt2>0)bonusNotes.push("💥 "+cnt2+" frozen!");}else if(onomEff==="metal"){var mrv=primary.length>=6?5:primary.length===5?3:primary.length===4?2:1;placed.forEach(function(p){newMetalCells[p.layer+","+p.row+","+p.col]={owner:pi,val:mrv};});bonusNotes.push("💥 metallicized!");}else if(onomEff==="stealth"){onomStealthHand=true;bonusNotes.push("💥 hand stealthed!");}}
@@ -395,7 +397,7 @@ if(action.type==="SUNSET"){
   if(!matching.length)return s;
   matching.sort(function(a,b){return b.cells.length-a.cells.length;});
   var target=matching[0];
-  var nbSun=s.board.map(function(lay,li){return lay.map(function(row,ri){return row.map(function(cell,ci){if(li===ML&&target.cells.some(function(c){return c.row===ri&&c.col===ci;})&&cell.letter)return Object.assign({},cell,{stealthy:true});return cell;});});});
+  var nbSun=s.board.map(function(lay,li){return lay.map(function(row,ri){return row.map(function(cell,ci){if(li===ML&&target.cells.some(function(c){return c.row===ri&&c.col===ci;})&&cell.letter)return Object.assign({},cell,{stealthy:true,sunsetStealthy:true});return cell;});});});
   var nSU=(s.sunsetUsed||[false,false]).slice();nSU[pi]=true;
   var sunWord=target.cells.map(function(c){return s.board[ML][c.row][c.col].letter;}).join("");
   return Object.assign({},s,{board:nbSun,sunsetUsed:nSU,log:["🌅 \""+sunWord+"\" shrouded in darkness"].concat(s.log).slice(0,20)});
@@ -434,7 +436,13 @@ function getView(auth,pi){
   var mistHandSet=new Set(mistTiles[pi]||[]);
   var mistBoardSet=new Set((mistBoardCells[pi]||[]).map(function(c){return c.layer+","+c.row+","+c.col;}));
   var safeB=safeBoard(auth.board);
-  var viewBoard=mistBoardSet.size>0?safeB.map(function(lay,la){return lay.map(function(row,r){return row.map(function(cell,c){if(mistBoardSet.has(la+","+r+","+c)&&cell.letter)return Object.assign({},cell,{stealthy:true});return cell;});}); }):safeB;
+  var isShadowblade=auth.classIds[pi]==="shadowblade";
+  var viewBoard=safeB.map(function(lay,la){return lay.map(function(row,r){return row.map(function(cell,c){
+    if(!cell.letter)return cell;
+    if(isShadowblade&&cell.sunsetStealthy)return Object.assign({},cell,{stealthy:false,sunsetStealthy:false});
+    if(mistBoardSet.has(la+","+r+","+c))return Object.assign({},cell,{stealthy:true});
+    return cell;
+  });});});
   var hawkeyeSet=new Set((auth.hawkeyeRevealed||[[],[]])[pi]||[]);
   var oppHandRaw=auth.hands[oi]||[];
   var oppHandIds=new Set(oppHandRaw.map(function(t){return t.id;}));
@@ -638,7 +646,7 @@ function GameUI({auth,onAction,myPI,isSolo,aiThinking,minionThinking,onRestart})
         <div style={{fontSize:10,color:"#6b7280",marginBottom:4}}>OPP {oppHandDisplay.length} tiles</div>
         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{oppHandDisplay.map(function(t,i){var isRev=t.revealed;var isPois=t.poisoned;var canPoisonTarget=myPoisonMode&&!isPois&&isMyTurn&&!blocked;var canSwoopTarget=mySwoopMode&&isMyTurn&&!blocked;return(<div key={i} onClick={canPoisonTarget?function(){onAction({type:"POISON_ARROW",tileId:t.id});}:canSwoopTarget?function(){onAction({type:"SWOOP_SNATCH",tileId:t.id});}:undefined} style={{width:36,height:40,background:isPois?"#1a0a1a":t.burning?"#3d1a00":t.frozenTurns>0?"#0c1a2e":isRev?"#0a2010":"#1a1a2e",border:"1px solid "+(isPois?"#a855f7":t.burning?"#f97316":t.frozenTurns>0?"#38bdf8":isRev?"#4ade80":canPoisonTarget||canSwoopTarget?"#fbbf24":oCls.accent),borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",cursor:(canPoisonTarget||canSwoopTarget)?"crosshair":"default"}}>{t.burning&&<span style={{position:"absolute",top:1,right:1,fontSize:7}}>f</span>}{t.frozenTurns>0&&<span style={{position:"absolute",top:1,left:1,fontSize:7}}>i{t.frozenTurns}</span>}{isRev&&!isPois&&<span style={{position:"absolute",top:1,right:1,fontSize:7}}>v</span>}{isPois&&<span style={{position:"absolute",top:1,right:1,fontSize:7}}>☠</span>}<span style={{fontSize:14,color:isPois?"#c084fc":isRev?"#4ade80":"#374151",fontWeight:"bold"}}>{t.letter}</span></div>);})}</div>
       </div>
-      {auth.turnPhase==="challenge"&&auth.lastPlay&&(<div style={{marginBottom:10,padding:"10px 12px",background:"#12101f",borderRadius:6,border:"1px solid "+oCls.accent}}><div style={{fontSize:11,marginBottom:6}}><span style={{color:auth.lastPlay.pi===myPI?mc.color:oCls.color}}>P{auth.lastPlay.pi+1}</span><span style={{color:"#9ca3af"}}> played: </span>{log[0]&&<span style={{color:"#e0e0f0",fontWeight:"bold"}}>{log[0].replace(/P\d+ played /,"").replace(/ ->.*$/,"")}</span>}<span style={{color:"#fbbf24"}}> {auth.lastPlay.dmg} dmg</span></div>{isChallengeable&&(<div style={{display:"flex",gap:8,alignItems:"center"}}><button onClick={function(){onAction({type:"CHALLENGE"});}} style={{padding:"5px 14px",background:"#450a0a",border:"1px solid #dc2626",borderRadius:4,color:"#f87171",cursor:"pointer",fontFamily:"monospace",fontSize:12}}>Challenge</button><button onClick={function(){onAction({type:"PASS"});}} style={{padding:"5px 14px",background:"#12101f",border:"1px solid #374151",borderRadius:4,color:"#6b7280",cursor:"pointer",fontFamily:"monospace",fontSize:12}}>Pass</button>{chalCD>0&&<div style={{marginLeft:"auto",width:28,height:28,borderRadius:"50%",border:"2px solid "+(chalCD<=3?"#ef4444":"#6b7280"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:chalCD<=3?"#f87171":"#6b7280"}}>{chalCD}</div>}</div>)}{!isChallengeable&&auth.lastPlay.pi===myPI&&<div style={{fontSize:11,color:"#6b7280"}}>Waiting...</div>}</div>)}
+      {auth.turnPhase==="challenge"&&auth.lastPlay&&(<div style={{marginBottom:10,padding:"10px 12px",background:"#12101f",borderRadius:6,border:"1px solid "+oCls.accent}}><div style={{fontSize:11,marginBottom:6}}><span style={{color:auth.lastPlay.pi===myPI?mc.color:oCls.color}}>P{auth.lastPlay.pi+1}</span><span style={{color:"#9ca3af"}}> played: </span><span style={{color:"#e0e0f0",fontWeight:"bold"}}>{auth.lastPlay.words.map(function(w){return w.word;}).join(", ")}</span><span style={{color:"#fbbf24"}}> — {auth.lastPlay.dmg} dmg</span></div>{isChallengeable&&(<div style={{display:"flex",gap:8,alignItems:"center"}}><button onClick={function(){onAction({type:"CHALLENGE"});}} style={{padding:"5px 14px",background:"#450a0a",border:"1px solid #dc2626",borderRadius:4,color:"#f87171",cursor:"pointer",fontFamily:"monospace",fontSize:12}}>Challenge</button><button onClick={function(){onAction({type:"PASS"});}} style={{padding:"5px 14px",background:"#12101f",border:"1px solid #374151",borderRadius:4,color:"#6b7280",cursor:"pointer",fontFamily:"monospace",fontSize:12}}>Pass</button>{chalCD>0&&<div style={{marginLeft:"auto",width:28,height:28,borderRadius:"50%",border:"2px solid "+(chalCD<=3?"#ef4444":"#6b7280"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:chalCD<=3?"#f87171":"#6b7280"}}>{chalCD}</div>}</div>)}{!isChallengeable&&auth.lastPlay.pi===myPI&&<div style={{fontSize:11,color:"#6b7280"}}>Waiting for opponent...</div>}</div>)}
       {!isMyTurn&&auth.turnPhase==="play"&&<div style={{marginBottom:8,padding:"6px 10px",background:"#0a0a1a",borderRadius:4,fontSize:11,color:"#6b7280",border:"1px solid #1e1b4b"}}>Opponent's turn...</div>}
       {isMyTurn&&auth.turnPhase==="play"&&<div style={{marginBottom:8,padding:"6px 10px",background:"#0a1a0a",borderRadius:4,fontSize:11,color:"#34d399",border:"1px solid #166534"}}>Your turn{myDisabledUA.length>0?" (abilities disabled)":""}{hasContortionist?" L-shapes on":""}</div>}
       {myFade&&<div style={{marginBottom:6,fontSize:11,color:"#34d399"}}>Faded</div>}
