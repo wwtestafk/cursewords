@@ -135,6 +135,7 @@ function applySacredGround(s){
   if(!s.classIds.includes("theologian"))return s;
   if(s.turnPhase!=="play")return s;
   var pi=s.classIds.indexOf("theologian");
+  if(s.whoseTurn!==pi)return s;
   var count=2+(s.ua[pi]&&s.ua[pi].includes("devout")?1:0);
   var occupied=new Set();
   s.board[ML].forEach(function(row,r){row.forEach(function(cell,c){if(cell.letter)occupied.add(r+","+c);});});
